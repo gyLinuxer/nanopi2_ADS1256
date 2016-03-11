@@ -761,7 +761,7 @@ int32_t ADS1256_GetAdc(uint8_t _ch)
 		return 0;
 	}
 
-	iTemp = g_tADS1256.AdcNow[_ch];
+	iTemp = g_tADS1256.AdcNow[/*_ch*/7];
 
 	return iTemp;
 }
@@ -797,10 +797,11 @@ void ADS1256_ISR(void)
 			g_tADS1256.AdcNow[g_tADS1256.Channel-1] = ADS1256_ReadData();	
 		}
 
-		if (++g_tADS1256.Channel >= 8)
+/*		if (++g_tADS1256.Channel >= 8)
 		{
 			g_tADS1256.Channel = 0;
 		}
+*/
 	}
 	else	/*DiffChannal*/
 	{
@@ -823,9 +824,9 @@ void ADS1256_ISR(void)
 			g_tADS1256.AdcNow[g_tADS1256.Channel-1] = ADS1256_ReadData();	
 		}
 
-		if (++g_tADS1256.Channel >= 4)
+//		if (++g_tADS1256.Channel >= 4)
 		{
-			g_tADS1256.Channel = 0;
+//			g_tADS1256.Channel = 0;
 		}
 	}
 }
@@ -843,7 +844,7 @@ uint8_t ADS1256_Scan(void)
 	//if (DRDY_IS_LOW())
 	{
 		ADS1256_ISR();
-		return 1;
+		return 0;
 	}
 
 	return 0;
@@ -893,7 +894,7 @@ uint16_t Voltage_Convert(float Vref, float voltage)
 *********************************************************************************************************
 */
 
-int  main()
+int  main(int argc,char* argv[])
 {
       uint8_t id;
 	int ret,rspeed;
@@ -903,6 +904,21 @@ int  main()
 	uint8_t ch_num;
 	int32_t iTemp;
 	uint8_t buf[3];
+	int opt=0;
+	while((opt=getopt(argc,argv,"C:"))!=-1){
+		switch(opt){
+		   case 'C':{
+			       i = atoi(optarg);
+				printf("now the channal number is:%d\n",i);
+				break;
+			    }
+		   default:{	
+					
+			   }
+		}
+	}	
+	
+
 	fd = open(device, O_RDWR);
 	if (fd < 0)
 		pabort("can't open device");
@@ -948,31 +964,9 @@ int  main()
 	printf("bits per word: %d\n", bits);
 	printf("max speed: %d Hz (%d KHz)\n", rspeed, rspeed/1000);
 
-	//transfer(fd);
-	spi_transf(0x10);
-	spi_transf(0x9);
-	usleep(10);
-	for (i=0;i<10;i++)
-		printf("%X ",read_byte());
-	/*
-	uint8_t buf[] = {0xEF,0xAB,0x12,0x43};
-	for ( i=0;i<4;i++)
-	{
-	    printf("%X ",read_after_write(fd,buf[i]));
-	}	
-	puts("");
-*/
-	puts("");
-	
-
-
-  	
-    //ADS1256_WriteReg(REG_MUX,0x01);
-    //ADS1256_WriteReg(REG_ADCON,0x20);
-   // ADS1256_CfgADC(ADS1256_GAIN_1, ADS1256_15SPS);
    id = ADS1256_ReadChipID();
    printf("\r\n");
-   printf("ID=\r\n");  
+   printf("ID=");  
 	if (id != 3)
 	{
 		printf("Error, ASD1256 Chip ID = 0x%d\r\n", (int)id);
@@ -983,44 +977,28 @@ int  main()
 	}
   	ADS1256_CfgADC(ADS1256_GAIN_1, ADS1256_15SPS);
        ADS1256_StartScan(0);
-	ch_num = 8;	
+//	ch_num = 8;	
 	//if (ADS1256_Scan() == 0)
 		//{
 			//continue;
-		//}
-		while(1)
-	{
-	       while((ADS1256_Scan() == 0));
-	//	for (i = 0; i < ch_num; i++)
-		i=0;
-		{
-			adc[i] = ADS1256_GetAdc(i);
-              	 volt[i] = (adc[i] * 100) / 167;	
-		}
-		
-		//for (i = 0; i < ch_num; i++)
-		{
-	                buf[0] = ((uint32_t)adc[i] >> 16) & 0xFF;
-	                buf[1] = ((uint32_t)adc[i] >> 8) & 0xFF;
-	                buf[2] = ((uint32_t)adc[i] >> 0) & 0xFF;
-	 //               printf("%d=%02X%02X%02X, %8ld", (int)i, (int)buf[0], 
-	  //                     (int)buf[1], (int)buf[2], (long)adc[i]);                
+			ADS1256_SetChannal(g_tADS1256.Channel);	/*Switch channel mode */
 
-	                iTemp = volt[i];	/* uV  */
-					if (iTemp < 0)
-					{
-						iTemp = -iTemp;
-	                  		  	printf(" (-%ld.%03ld %03ld V) \r\n", iTemp /1000000, (iTemp%1000000)/1000, iTemp%1000);
-					}
-					else
-					{
-	                    			printf(" ( %ld.%03ld %03ld V) \r\n", iTemp /1000000, (iTemp%1000000)/1000, iTemp%1000);                    
-					}
-					
-		}
-	//		printf("\33[%dA", (int)ch_num);  
-		//bsp_DelayUS(1000);	
-			}	
+		ADS1256_WriteCmd(0x03);
+
+	//}	
+	while(1)
+	{	
+		ADS1256_WaitDRDY();
+
+		i=0;
+	  	adc[i] = ADS1256_ReadData();
+              	volt[i] = (adc[i] * 100) / 167;	
+
+
+	        iTemp = volt[i];	/* uV  */
+	   	printf(" ( %ld.%03ld %03ld V) \r\n", iTemp /1000000, (iTemp%1000000)/1000, iTemp%1000);                    
+		bsp_DelayUS(10);
+	}	
 
 	
     return 0;
